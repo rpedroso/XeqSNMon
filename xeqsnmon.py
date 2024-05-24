@@ -164,7 +164,7 @@ def check_uptime_proof(node_list):
             continue
         proof_age = now - node.last_uptime_proof
 
-        if proof_age > 1800:
+        if proof_age > 3600:
             delayed_list.append(node)
 
     if delayed_list:
@@ -222,8 +222,6 @@ TO = os.getenv('TO')
 if not TOKEN or not TO:
     raise ValueError()
 
-bot = Bot(TOKEN)
-
 
 def chunk_list(lst, chunk_size=5):
     # list_chunked = [my_list[i:i + chunk_size] \
@@ -235,19 +233,19 @@ def chunk_list(lst, chunk_size=5):
 class Listener:
     def on_vanished_nodes(self, nodes):
         print('on_vanished_nodes')
-        for chunk in chunk_list(nodes, 5):
+        for chunk in chunk_list(nodes, 40):
             pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
             bot.send_message(TO, f'Vanished node(s):\n{pks}\n')
 
     def on_new_nodes(self, nodes):
         print('on_new_nodes', nodes)
-        for chunk in chunk_list(nodes, 5):
+        for chunk in chunk_list(nodes, 40):
             pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
             bot.send_message(TO, f'New node(s):\n{pks}\n')
 
     def on_delayed_nodes(self, nodes):
         print('on_delayed_nodes')
-        for chunk in chunk_list(nodes, 5):
+        for chunk in chunk_list(nodes, 40):
             pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
             bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
 
@@ -270,6 +268,8 @@ class FakeBot:
         print('_' * 60)
         print(message)
         print('_' * 60)
+
+bot = Bot(TOKEN)
 
 
 if __name__ == "__main__":
