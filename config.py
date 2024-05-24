@@ -21,4 +21,4 @@ class FakeBot:
         print('_' * 60)
 
 
-bot = FakeBot(TOKEN)
+bot = Bot(TOKEN)
