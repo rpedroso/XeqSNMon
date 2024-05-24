@@ -109,7 +109,7 @@ def get_all():
                              "id": "0",
                              "method": "get_service_nodes"
                          },
-                         timeout=2).json()['result']['service_node_states']
+                         timeout=20).json()['result']['service_node_states']
     return SNodes(resp)
 
 
