@@ -1,6 +1,6 @@
 from gevent import monkey; monkey.patch_all()  # noqa
 
-import os
+# import os
 import pickle
 import logging
 from datetime import datetime
@@ -10,11 +10,8 @@ from copy import copy
 import requests
 import humanize
 from pydispatch import dispatcher
-from origamibot import OrigamiBot as Bot
-
-
-# NODE_URL = 'http://localhost:9231/json_rpc'
-NODE_URL = 'http://154.38.165.93:9231/json_rpc'
+# from origamibot import OrigamiBot as Bot
+from config import bot, TO, NODE_URL
 
 
 class SNode:
@@ -154,11 +151,11 @@ def check_new(prev_list, current_list):
 
 def check_uptime_proof(node_list):
     delayed_list = SNodes()
-    now = datetime.timestamp(datetime.utcnow())
+    now = datetime.timestamp(datetime.now())
     for node in node_list:
         # Ignore.
-        if node.last_uptime_proof == 0:
-            continue
+        # if node.last_uptime_proof == 0:
+        #     continue
         proof_age = now - node.last_uptime_proof
 
         if proof_age > 3600:
@@ -208,18 +205,6 @@ def main():
     #     gevent.sleep(10)
 
 
-# ENV VARS
-# FROM = os.getenv('FROM_ADDRESS')
-# FROM_PASS = os.getenv('FROM_PASS')
-# TO = os.getenv('TO_ADDRESS')
-
-TOKEN = os.getenv('TOKEN')
-TO = os.getenv('TO')
-
-if not TOKEN or not TO:
-    raise ValueError()
-
-
 def chunk_list(lst, chunk_size=5):
     # list_chunked = [my_list[i:i + chunk_size] \
     #    for i in range(0, len(my_list), chunk_size)]
@@ -260,12 +245,16 @@ class Listener:
 
     def on_delayed_nodes(self, nodes):
         print('on_delayed_nodes')
-        now = datetime.timestamp(datetime.utcnow())
+        now = datetime.timestamp(datetime.now())
         for chunk in chunk_list(nodes, 40):
             pk_list = []
             for node in chunk:
                 proof_age = now - node.last_uptime_proof
-                hproof = humanize.precisedelta(proof_age, format="%0.4f")
+                if node.last_uptime_proof == 0:
+                    hproof = 'Proof not received'
+                else:
+                    hproof = humanize.precisedelta(proof_age, format="%0.4f")
+
                 pk_list.append(f'{node.service_node_pubkey} - {hproof}')
 
             pks = '\n'.join(pk_list)
@@ -280,19 +269,6 @@ def bot_main():
     dispatcher.connect(listener.on_vanished_nodes, 'EVT_VANISHED_NODES')
     dispatcher.connect(listener.on_new_nodes, 'EVT_NEW_NODES')
     dispatcher.connect(listener.on_delayed_nodes, 'EVT_DELAYED_NODES')
-
-
-class FakeBot:
-    def __init__(self, *args):
-        pass
-
-    def send_message(self, chat_id, message, **kwargs):
-        print('_' * 60)
-        print(message)
-        print('_' * 60)
-
-
-bot = Bot(TOKEN)
 
 
 if __name__ == "__main__":
