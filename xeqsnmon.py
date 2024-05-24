@@ -124,8 +124,8 @@ def check_vanish(prev_list, current_list):
             vanish_list.append(node)
 
     # For testing - add a node to the list
-    if not vanish_list:
-        vanish_list.append(node)
+    # if not vanish_list:
+    #     vanish_list.append(node)
 
     if vanish_list:
         logging.warning('Vanished Node(s):')
