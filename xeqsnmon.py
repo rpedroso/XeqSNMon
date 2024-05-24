@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from copy import copy
 
-import gevent
+# import gevent
 import requests
 import humanize
 from pydispatch import dispatcher
@@ -74,21 +74,18 @@ class SNodes:
         return len(self._node_list)
 
     def __getitem__(self, key):
-        print('getitem', key)
-        # return getattr(self, item)
         if isinstance(key, slice):
             # Get the start, stop, and step from the slice
             return [self._node_list[ii]
                     for ii in range(*key.indices(len(self._node_list)))]
         elif isinstance(key, int):
-            if key < 0: # Handle negative indices
+            if key < 0:  # Handle negative indices
                 key += len(self._node_list)
             if key < 0 or key >= len(self._node_list):
                 raise IndexError("The index (%d) is out of range." % key)
             return self._node_list[key]
         else:
             raise TypeError("Invalid argument type.")
-
 
     # def __next__(self):
     #     try:
@@ -233,20 +230,45 @@ def chunk_list(lst, chunk_size=5):
 class Listener:
     def on_vanished_nodes(self, nodes):
         print('on_vanished_nodes')
+        # for chunk in chunk_list(nodes, 40):
+        #     pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+        #     bot.send_message(TO, f'Vanished node(s):\n{pks}\n')
+
         for chunk in chunk_list(nodes, 40):
-            pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+            pk_list = []
+            for node in chunk:
+                pk_list.append(f'{node.service_node_pubkey} - '
+                               f'Reg.Height: {node.registration_height}')
+
+            pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Vanished node(s):\n{pks}\n')
 
     def on_new_nodes(self, nodes):
         print('on_new_nodes', nodes)
+        # for chunk in chunk_list(nodes, 40):
+        #     pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+        #     bot.send_message(TO, f'New node(s):\n{pks}\n')
+
         for chunk in chunk_list(nodes, 40):
-            pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+            pk_list = []
+            for node in chunk:
+                pk_list.append(f'{node.service_node_pubkey} - '
+                               f'Reg.Height: {node.registration_height}')
+
+            pks = '\n'.join(pk_list)
             bot.send_message(TO, f'New node(s):\n{pks}\n')
 
     def on_delayed_nodes(self, nodes):
         print('on_delayed_nodes')
+        now = datetime.timestamp(datetime.utcnow())
         for chunk in chunk_list(nodes, 40):
-            pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+            pk_list = []
+            for node in chunk:
+                proof_age = now - node.last_uptime_proof
+                hproof = humanize.precisedelta(proof_age, format="%0.4f")
+                pk_list.append(f'{node.service_node_pubkey} - {hproof}')
+
+            pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
 
 
@@ -268,6 +290,7 @@ class FakeBot:
         print('_' * 60)
         print(message)
         print('_' * 60)
+
 
 bot = Bot(TOKEN)
 
