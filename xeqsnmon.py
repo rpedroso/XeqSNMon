@@ -73,6 +73,23 @@ class SNodes:
     def __len__(self):
         return len(self._node_list)
 
+    def __getitem__(self, key):
+        print('getitem', key)
+        # return getattr(self, item)
+        if isinstance(key, slice):
+            # Get the start, stop, and step from the slice
+            return [self._node_list[ii]
+                    for ii in range(*key.indices(len(self._node_list)))]
+        elif isinstance(key, int):
+            if key < 0: # Handle negative indices
+                key += len(self._node_list)
+            if key < 0 or key >= len(self._node_list):
+                raise IndexError("The index (%d) is out of range." % key)
+            return self._node_list[key]
+        else:
+            raise TypeError("Invalid argument type.")
+
+
     # def __next__(self):
     #     try:
     #         result = self._node_list[self._index]
@@ -107,8 +124,8 @@ def check_vanish(prev_list, current_list):
             vanish_list.append(node)
 
     # For testing - add a node to the list
-    # if not vanish_list:
-    #     vanish_list.append(node)
+    if not vanish_list:
+        vanish_list.append(node)
 
     if vanish_list:
         logging.warning('Vanished Node(s):')
@@ -208,21 +225,31 @@ if not TOKEN or not TO:
 bot = Bot(TOKEN)
 
 
+def chunk_list(lst, chunk_size=5):
+    # list_chunked = [my_list[i:i + chunk_size] \
+    #    for i in range(0, len(my_list), chunk_size)]
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
+
+
 class Listener:
     def on_vanished_nodes(self, nodes):
         print('on_vanished_nodes')
-        pks = '\n'.join(str(node.service_node_pubkey) for node in nodes)
-        bot.send_message(TO, f'Vanished node(s):\n{pks}\n')
+        for chunk in chunk_list(nodes, 5):
+            pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+            bot.send_message(TO, f'Vanished node(s):\n{pks}\n')
 
     def on_new_nodes(self, nodes):
         print('on_new_nodes', nodes)
-        pks = '\n'.join(str(node.service_node_pubkey) for node in nodes)
-        bot.send_message(TO, f'New node(s):\n{pks}\n')
+        for chunk in chunk_list(nodes, 5):
+            pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+            bot.send_message(TO, f'New node(s):\n{pks}\n')
 
     def on_delayed_nodes(self, nodes):
         print('on_delayed_nodes')
-        pks = '\n'.join(str(node.service_node_pubkey) for node in nodes)
-        bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
+        for chunk in chunk_list(nodes, 5):
+            pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
+            bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
 
 
 def bot_main():
