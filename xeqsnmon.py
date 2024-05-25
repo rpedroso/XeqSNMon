@@ -224,8 +224,9 @@ class Listener:
         for chunk in chunk_list(nodes, 40):
             pk_list = []
             for node in chunk:
-                pk_list.append(f'{node.service_node_pubkey} - '
-                               f'Reg.Height: {node.registration_height}')
+                pk_list.append(
+                    f'{node.service_node_pubkey} - '
+                    f'Registration Height: {node.registration_height}')
 
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Vanished node(s):\n{pks}\n')
@@ -239,8 +240,9 @@ class Listener:
         for chunk in chunk_list(nodes, 40):
             pk_list = []
             for node in chunk:
-                pk_list.append(f'{node.service_node_pubkey} - '
-                               f'Reg.Height: {node.registration_height}')
+                pk_list.append(
+                    f'{node.service_node_pubkey} - '
+                    f'Registration Height: {node.registration_height}')
 
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'New node(s):\n{pks}\n')
