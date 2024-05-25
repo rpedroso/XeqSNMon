@@ -234,7 +234,6 @@ def run_once():
         prev_node_list = None
 
     daemon = Daemon.fetch()
-    print(daemon)
 
     resp = get_all()
 
@@ -246,7 +245,8 @@ def run_once():
 
     check_uptime_proof(resp)
 
-    dispatcher.send('EVT_TOTAL_NODES', sender=dispatcher.Anonymous, nodes=resp)
+    dispatcher.send('EVT_TOTAL_NODES', sender=dispatcher.Anonymous, nodes=resp,
+                    daemon=daemon)
 
     with open('node_list.dump', 'wb') as f:
         pickle.dump(prev_node_list, f)
@@ -325,11 +325,13 @@ class Listener:
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
 
-    def on_total_nodes(self, nodes):
+    def on_total_nodes(self, nodes, daemon):
         uniq = len(set(node.operator_address for node in nodes))
         total = len(nodes)
         bot.send_message(TO, f'Total node(s): {total}\n'
-                         f'Unique Operators: {uniq}\n')
+                         f'Unique Operators: {uniq}\n'
+                         f'Height: {daemon.height}\n'
+                         )
 
 
 def bot_main():
