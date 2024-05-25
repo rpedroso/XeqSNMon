@@ -11,7 +11,59 @@ import requests
 import humanize
 from pydispatch import dispatcher
 # from origamibot import OrigamiBot as Bot
-from config import bot, TO, NODE_URL
+try:
+    from config_local import bot, TO, NODE_URL
+except ImportError:
+    from config import bot, TO, NODE_URL
+
+
+class Daemon:
+    __slots__ = ('alt_blocks_count',
+                 'block_size_limit',
+                 'block_size_median',
+                 'block_weight_limit',
+                 'block_weight_median',
+                 'bootstrap_daemon_address',
+                 'cumulative_difficulty',
+                 'cumulative_difficulty_top64',
+                 'database_size',
+                 'difficulty',
+                 'difficulty_top64',
+                 'free_space',
+                 'grey_peerlist_size',
+                 'height',
+                 'height_without_bootstrap',
+                 'incoming_connections_count',
+                 'mainnet',
+                 'nettype',
+                 'offline',
+                 'outgoing_connections_count',
+                 'rpc_connections_count',
+                 'stagenet',
+                 'start_time',
+                 'status',
+                 'target',
+                 'target_height',
+                 'testnet',
+                 'top_block_hash',
+                 'tx_count',
+                 'tx_pool_size',
+                 'untrusted',
+                 'update_available',
+                 'version',
+                 'was_bootstrap_ever_used',
+                 'white_peerlist_size',
+                 'wide_cumulative_difficulty',
+                 'wide_difficulty')
+
+    def __init__(self, sn_dict):
+        for key, value in sn_dict.items():
+            setattr(self, key, value)
+
+    @staticmethod
+    def fetch():
+        status = requests.get(NODE_URL + '/get_info', timeout=20).json()
+        return Daemon(status)
 
 
 class SNode:
@@ -100,7 +152,7 @@ class SNodes:
 
 
 def get_all():
-    resp = requests.post(NODE_URL,
+    resp = requests.post(NODE_URL + '/json_rpc',
                          json={
                              "jsonrpc": "2.0",
                              "id": "0",
@@ -110,7 +162,7 @@ def get_all():
     return SNodes(resp)
 
 
-def check_vanish(prev_list, current_list):
+def check_vanish(daemon, prev_list, current_list):
     vanish_list = SNodes()
 
     for node in prev_list:
@@ -127,10 +179,10 @@ def check_vanish(prev_list, current_list):
         for node in vanish_list:
             logging.warning(f'{node.service_node_pubkey}')
         dispatcher.send('EVT_VANISHED_NODES', sender=dispatcher.Anonymous,
-                        nodes=vanish_list)
+                        nodes=vanish_list, daemon=daemon)
 
 
-def check_new(prev_list, current_list):
+def check_new(daemon, prev_list, current_list):
     new_list = SNodes()
 
     for node in current_list:
@@ -181,11 +233,14 @@ def run_once():
     except FileNotFoundError:
         prev_node_list = None
 
+    daemon = Daemon.fetch()
+    print(daemon)
+
     resp = get_all()
 
     if prev_node_list:
-        check_vanish(prev_node_list, resp)
-        check_new(prev_node_list, resp)
+        check_vanish(daemon, prev_node_list, resp)
+        check_new(daemon, prev_node_list, resp)
 
     prev_node_list = resp.copy()
 
@@ -215,7 +270,7 @@ def chunk_list(lst, chunk_size=5):
 
 
 class Listener:
-    def on_vanished_nodes(self, nodes):
+    def on_vanished_nodes(self, nodes, daemon):
         print('on_vanished_nodes')
         # for chunk in chunk_list(nodes, 40):
         #     pks = '\n'.join(str(node.service_node_pubkey) for node in chunk)
@@ -224,9 +279,14 @@ class Listener:
         for chunk in chunk_list(nodes, 40):
             pk_list = []
             for node in chunk:
+                if node.registration_height + 20180 <= daemon.height:
+                    expired = 'expired'
+                else:
+                    expired = 'lost'
                 pk_list.append(
-                    f'{node.service_node_pubkey} - '
-                    f'Registration Height: {node.registration_height}')
+                    f'{node.service_node_pubkey} - {expired} - '
+                    f'Registration Height: {node.registration_height}'
+                )
 
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Vanished node(s):\n{pks}\n')
@@ -242,7 +302,8 @@ class Listener:
             for node in chunk:
                 pk_list.append(
                     f'{node.service_node_pubkey} - '
-                    f'Registration Height: {node.registration_height}')
+                    f'Registration Height: {node.registration_height}'
+                )
 
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'New node(s):\n{pks}\n')
