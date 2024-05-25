@@ -191,6 +191,8 @@ def run_once():
 
     check_uptime_proof(resp)
 
+    dispatcher.send('EVT_TOTAL_NODES', sender=dispatcher.Anonymous, nodes=resp)
+
     with open('node_list.dump', 'wb') as f:
         pickle.dump(prev_node_list, f)
 
@@ -260,6 +262,12 @@ class Listener:
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
 
+    def on_total_nodes(self, nodes):
+        uniq = len(set(node.operator_address for node in nodes))
+        total = len(nodes)
+        bot.send_message(TO, f'Total node(s): {total}\n'
+                         f'Unique Operators: {uniq}\n')
+
 
 def bot_main():
     global listener
@@ -269,6 +277,7 @@ def bot_main():
     dispatcher.connect(listener.on_vanished_nodes, 'EVT_VANISHED_NODES')
     dispatcher.connect(listener.on_new_nodes, 'EVT_NEW_NODES')
     dispatcher.connect(listener.on_delayed_nodes, 'EVT_DELAYED_NODES')
+    dispatcher.connect(listener.on_total_nodes, 'EVT_TOTAL_NODES')
 
 
 if __name__ == "__main__":
