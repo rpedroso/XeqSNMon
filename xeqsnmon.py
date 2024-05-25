@@ -158,7 +158,7 @@ def check_uptime_proof(node_list):
         #     continue
         proof_age = now - node.last_uptime_proof
 
-        if proof_age > 3600:
+        if proof_age > 5400:
             delayed_list.append(node)
 
     if delayed_list:
