@@ -61,7 +61,7 @@ class Daemon:
             setattr(self, key, value)
 
     @staticmethod
-    def fetch():
+    def info():
         status = requests.get(NODE_URL + '/get_info', timeout=20).json()
         return Daemon(status)
 
@@ -150,112 +150,114 @@ class SNodes:
     def copy(self):
         return copy(self)
 
+    @staticmethod
+    def get_all():
+        resp = requests.post(NODE_URL + '/json_rpc',
+                             json={
+                                 "jsonrpc": "2.0",
+                                 "id": "0",
+                                 "method": "get_service_nodes"
+                             },
+                             timeout=20
+                             ).json()['result']['service_node_states']
+        return SNodes(resp)
 
-def get_all():
-    resp = requests.post(NODE_URL + '/json_rpc',
-                         json={
-                             "jsonrpc": "2.0",
-                             "id": "0",
-                             "method": "get_service_nodes"
-                         },
-                         timeout=20).json()['result']['service_node_states']
-    return SNodes(resp)
+    @staticmethod
+    def check_vanish(daemon, prev_list, current_list):
+        vanish_list = SNodes()
 
+        for node in prev_list:
+            if node not in current_list:
+                vanish_list.append(node)
 
-def check_vanish(daemon, prev_list, current_list):
-    vanish_list = SNodes()
+        # For testing - add a node to the list
+        # if not vanish_list:
+        #     vanish_list.append(node)
 
-    for node in prev_list:
-        if node not in current_list:
-            vanish_list.append(node)
+        if vanish_list:
+            logging.warning('Vanished Node(s):')
 
-    # For testing - add a node to the list
-    # if not vanish_list:
-    #     vanish_list.append(node)
+            for node in vanish_list:
+                logging.warning(f'{node.service_node_pubkey}')
+            dispatcher.send('EVT_VANISHED_NODES', sender=dispatcher.Anonymous,
+                            nodes=vanish_list, daemon=daemon)
 
-    if vanish_list:
-        logging.warning('Vanished Node(s):')
+    @staticmethod
+    def check_new(daemon, prev_list, current_list):
+        new_list = SNodes()
 
-        for node in vanish_list:
-            logging.warning(f'{node.service_node_pubkey}')
-        dispatcher.send('EVT_VANISHED_NODES', sender=dispatcher.Anonymous,
-                        nodes=vanish_list, daemon=daemon)
+        for node in current_list:
+            if node not in prev_list:
+                new_list.append(node)
 
+        # For testing - add a node to the list
+        # if not new_list:
+        #     new_list.append(node)
 
-def check_new(daemon, prev_list, current_list):
-    new_list = SNodes()
+        if new_list:
+            logging.warning('New node(s):')
 
-    for node in current_list:
-        if node not in prev_list:
-            new_list.append(node)
+            for node in new_list:
+                logging.warning(f'\t{node.service_node_pubkey}')
+            dispatcher.send('EVT_NEW_NODES',
+                            dispatcher.Anonymous, nodes=new_list)
 
-    # For testing - add a node to the list
-    # if not new_list:
-    #     new_list.append(node)
-
-    if new_list:
-        logging.warning('New node(s):')
-
-        for node in new_list:
-            logging.warning(f'\t{node.service_node_pubkey}')
-        dispatcher.send('EVT_NEW_NODES', dispatcher.Anonymous, nodes=new_list)
-
-
-def check_uptime_proof(node_list):
-    delayed_list = SNodes()
-    now = datetime.timestamp(datetime.now())
-    for node in node_list:
-        # Ignore.
-        # if node.last_uptime_proof == 0:
-        #     continue
-        proof_age = now - node.last_uptime_proof
-
-        if proof_age > 5400:
-            delayed_list.append(node)
-
-    if delayed_list:
-        logging.warning('Delayed node(s):')
-
-        for node in delayed_list:
+    @staticmethod
+    def check_uptime_proof(node_list):
+        delayed_list = SNodes()
+        now = datetime.timestamp(datetime.now())
+        for node in node_list:
+            # Ignore.
+            # if node.last_uptime_proof == 0:
+            #     continue
             proof_age = now - node.last_uptime_proof
-            hproof = humanize.precisedelta(proof_age, format="%0.4f")
-            logging.warning(f'\t{node.service_node_pubkey}')
-            logging.warning(f'\t\tDelayed by {hproof}')
 
-        dispatcher.send('EVT_DELAYED_NODES', sender=dispatcher.Anonymous,
-                        nodes=delayed_list)
+            if proof_age > 5400:
+                delayed_list.append(node)
+
+        if delayed_list:
+            logging.warning('Delayed node(s):')
+
+            for node in delayed_list:
+                proof_age = now - node.last_uptime_proof
+                hproof = humanize.precisedelta(proof_age, format="%0.4f")
+                logging.warning(f'\t{node.service_node_pubkey}')
+                logging.warning(f'\t\tDelayed by {hproof}')
+
+            dispatcher.send('EVT_DELAYED_NODES', sender=dispatcher.Anonymous,
+                            nodes=delayed_list)
+
+    @staticmethod
+    def check():
+        try:
+            with open('node_list.dump', 'rb') as f:
+                prev_node_list = pickle.load(f)
+        except FileNotFoundError:
+            prev_node_list = None
+
+        daemon = Daemon.info()
+
+        resp = SNodes.get_all()
+
+        if prev_node_list:
+            SNodes.check_vanish(daemon, prev_node_list, resp)
+            SNodes.check_new(daemon, prev_node_list, resp)
+
+        prev_node_list = resp.copy()
+
+        SNodes.check_uptime_proof(resp)
+
+        dispatcher.send('EVT_TOTAL_NODES', sender=dispatcher.Anonymous,
+                        nodes=resp, daemon=daemon)
+
+        with open('node_list.dump', 'wb') as f:
+            pickle.dump(prev_node_list, f)
+
+        logging.info('Total nodes:', len(resp))
 
 
-def run_once():
-    try:
-        with open('node_list.dump', 'rb') as f:
-            prev_node_list = pickle.load(f)
-    except FileNotFoundError:
-        prev_node_list = None
-
-    daemon = Daemon.fetch()
-
-    resp = get_all()
-
-    if prev_node_list:
-        check_vanish(daemon, prev_node_list, resp)
-        check_new(daemon, prev_node_list, resp)
-
-    prev_node_list = resp.copy()
-
-    check_uptime_proof(resp)
-
-    dispatcher.send('EVT_TOTAL_NODES', sender=dispatcher.Anonymous, nodes=resp,
-                    daemon=daemon)
-
-    with open('node_list.dump', 'wb') as f:
-        pickle.dump(prev_node_list, f)
-
-    logging.info('Total nodes:', len(resp))
-
-
-def main():
-    run_once()
+# def main():
+    # run_once()
     # while True:
     #     run_once()
     #     logging.info('Sleeping...')
@@ -334,7 +336,7 @@ class Listener:
                          )
 
 
-def bot_main():
+def main():
     global listener
 
     listener = Listener()
@@ -344,8 +346,9 @@ def bot_main():
     dispatcher.connect(listener.on_delayed_nodes, 'EVT_DELAYED_NODES')
     dispatcher.connect(listener.on_total_nodes, 'EVT_TOTAL_NODES')
 
+    SNodes.check()
+
 
 if __name__ == "__main__":
     # gevent.spawn(bot_main)
-    bot_main()
     main()
