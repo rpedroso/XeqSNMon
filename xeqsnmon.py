@@ -186,7 +186,7 @@ def check_new(daemon, prev_list, current_list):
     new_list = SNodes()
 
     for node in current_list:
-        if node not in current_list:
+        if node not in prev_list:
             new_list.append(node)
 
     # For testing - add a node to the list
