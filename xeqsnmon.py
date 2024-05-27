@@ -228,6 +228,28 @@ class SNodes:
                             nodes=delayed_list)
 
     @staticmethod
+    def check_about_to_expire(node_list, daemon):
+        toexpire_list = SNodes()
+
+        for node in node_list:
+            # Ignore.
+            # if node.last_uptime_proof == 0:
+            #     continue
+            node_expires_at = node.registration_height + 20180
+            if node_expires_at + 100 > daemon.height:
+                toexpire_list.append(node)
+
+        if toexpire_list:
+            logging.warning('To expire node(s):')
+
+            for node in toexpire_list:
+                # hproof = humanize.precisedelta(proof_age, format="%0.4f")
+                logging.warning(f'\t{node.service_node_pubkey}')
+
+            dispatcher.send('EVT_TO_EXPIRE_NODES', sender=dispatcher.Anonymous,
+                            nodes=toexpire_list, daemon=daemon)
+
+    @staticmethod
     def check():
         try:
             with open('node_list.dump', 'rb') as f:
@@ -246,6 +268,7 @@ class SNodes:
         prev_node_list = resp.copy()
 
         SNodes.check_uptime_proof(resp)
+        SNodes.check_about_to_expire(resp, daemon)
 
         dispatcher.send('EVT_TOTAL_NODES', sender=dispatcher.Anonymous,
                         nodes=resp, daemon=daemon)
@@ -335,6 +358,21 @@ class Listener:
                          f'Height: {daemon.height}\n'
                          )
 
+    def on_to_expire_nodes(self, nodes, daemon):
+        for chunk in chunk_list(nodes, 40):
+            pk_list = []
+            for node in chunk:
+                expires_at = node.registration_height + 20180
+                blocks_left = expires_at - daemon.height
+                pk_list.append(
+                    f'{node.service_node_pubkey} - '
+                    f'To expire at: {expires_at} ({blocks_left} '
+                    'blocks to expire)'
+                )
+
+            pks = '\n'.join(pk_list)
+            bot.send_message(TO, f'To expire node(s):\n{pks}\n')
+
 
 def main():
     global listener
@@ -345,6 +383,7 @@ def main():
     dispatcher.connect(listener.on_new_nodes, 'EVT_NEW_NODES')
     dispatcher.connect(listener.on_delayed_nodes, 'EVT_DELAYED_NODES')
     dispatcher.connect(listener.on_total_nodes, 'EVT_TOTAL_NODES')
+    dispatcher.connect(listener.on_to_expire_nodes, 'EVT_TO_EXPIRE_NODES')
 
     SNodes.check()
 
