@@ -107,9 +107,10 @@ class SNode:
             return True
         return False
 
-    def check_about_to_expire(self, daemon):
-        node_expires_at = self.registration_height + 20180
-        if node_expires_at + 100 > daemon.height:
+    def check_to_expire(self, daemon):
+        expires_at = self.registration_height + 20180
+        blocks_left = expires_at - daemon.height
+        if 0 < blocks_left <= 720:
             return True
         return False
 
@@ -194,7 +195,7 @@ class SNodes:
             if is_delayed:
                 delayed_list.append(node)
 
-            is_to_expire = node.check_about_to_expire(daemon)
+            is_to_expire = node.check_to_expire(daemon)
             if is_to_expire:
                 to_expire_list.append(node)
 
@@ -234,11 +235,11 @@ class Listener:
             pk_list = []
             for node in chunk:
                 if node.registration_height + 20180 <= daemon.height:
-                    expired = 'Expired'
+                    expired = '💥 Expired'
                 else:
-                    expired = 'Lost'
+                    expired = '🩸 Lost'
                 pk_list.append(
-                    f'{node.service_node_pubkey} - {expired} - '
+                    f'{node.service_node_pubkey[:10]}... - {expired} - '
                     f'Registration Height: {node.registration_height}'
                 )
 
@@ -250,8 +251,8 @@ class Listener:
             pk_list = []
             for node in chunk:
                 pk_list.append(
-                    f'{node.service_node_pubkey} - '
-                    f'Registration Height: {node.registration_height}'
+                    f'{node.service_node_pubkey[:10]}... - '
+                    f'🆕 Registration Height: {node.registration_height}'
                 )
 
             pks = '\n'.join(pk_list)
@@ -264,11 +265,12 @@ class Listener:
             for node in chunk:
                 proof_age = now - node.last_uptime_proof
                 if node.last_uptime_proof == 0:
-                    hproof = 'Proof not received'
+                    hproof = '🚫 Proof not received'
                 else:
-                    hproof = humanize.precisedelta(proof_age, format="%0.4f")
+                    hproof = "🕙 %s" % humanize.precisedelta(proof_age,
+                                                               format="%0.4f")
 
-                pk_list.append(f'{node.service_node_pubkey} - {hproof}')
+                pk_list.append(f'{node.service_node_pubkey[:10]}... - {hproof}')
 
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
@@ -288,9 +290,9 @@ class Listener:
                 expires_at = node.registration_height + 20180
                 blocks_left = expires_at - daemon.height
                 pk_list.append(
-                    f'{node.service_node_pubkey} - '
-                    f'To expire at: {expires_at} ({blocks_left} '
-                    'blocks to expire)'
+                    f'{node.service_node_pubkey[:10]}... - '
+                    f'🧨 To expire at {expires_at} ({blocks_left} '
+                    'blocks left)'
                 )
 
             pks = '\n'.join(pk_list)
