@@ -89,31 +89,6 @@ class SNode:
     def get(self, key):
         return getattr(self, key)
 
-    def check_vanish(self, prev_list):
-        if self not in prev_list:
-            return True
-        return False
-
-    def check_new(self, prev_list):
-        if self not in prev_list:
-            return True
-        return False
-
-    def check_delayed(self):
-        now = datetime.timestamp(datetime.now())
-        proof_age = now - self.last_uptime_proof
-
-        if proof_age > 5400:
-            return True
-        return False
-
-    def check_to_expire(self, daemon):
-        expires_at = self.registration_height + 20180
-        blocks_left = expires_at - daemon.height
-        if 0 < blocks_left <= 720:
-            return True
-        return False
-
 
 class SNodes:
     def __init__(self, node_list=[]):
@@ -163,6 +138,31 @@ class SNodes:
                              ).json()['result']['service_node_states']
         return SNodes(resp)
 
+    def check_vanish(self, node):
+        if node not in self:
+            return True
+        return False
+
+    def check_new(self, node, prev_list):
+        if node not in prev_list:
+            return True
+        return False
+
+    def check_delayed(self, node):
+        now = datetime.timestamp(datetime.now())
+        proof_age = now - node.last_uptime_proof
+
+        if proof_age > 5400:
+            return True
+        return False
+
+    def check_to_expire(self, node, daemon):
+        expires_at = node.registration_height + 20180
+        blocks_left = expires_at - daemon.height
+        if 0 < blocks_left <= 720:
+            return True
+        return False
+
     def check(self):
         try:
             with open('node_list.dump', 'rb') as f:
@@ -179,23 +179,23 @@ class SNodes:
         delayed_list = SNodes()
         to_expire_list = SNodes()
 
-        for node in self:
-            if prev_node_list:
-                is_vanished_node = node.check_vanish(prev_node_list)
+        if prev_node_list:
+            for node in prev_node_list:
+                is_vanished_node = self.check_vanish(node)
                 if is_vanished_node:
                     vanish_list.append(node)
-                    continue
 
-                is_new_node = node.check_new(prev_node_list)
+            for node in self:
+                is_new_node = self.check_new(node, prev_node_list)
                 if is_new_node:
                     new_list.append(node)
                     continue
 
-            is_delayed = node.check_delayed()
+            is_delayed = self.check_delayed(node)
             if is_delayed:
                 delayed_list.append(node)
 
-            is_to_expire = node.check_to_expire(daemon)
+            is_to_expire = self.check_to_expire(node, daemon)
             if is_to_expire:
                 to_expire_list.append(node)
 
@@ -214,7 +214,7 @@ class SNodes:
             dispatcher.send('EVT_TO_EXPIRE_NODES', sender=dispatcher.Anonymous,
                             nodes=to_expire_list, daemon=daemon)
 
-        if vanish_list or new_list or delayed_list or to_expire_list:
+        if 1:  # vanish_list or new_list or delayed_list or to_expire_list:
             dispatcher.send('EVT_TOTAL_NODES', sender=dispatcher.Anonymous,
                             nodes=self, daemon=daemon)
 
@@ -252,11 +252,11 @@ class Listener:
             for node in chunk:
                 pk_list.append(
                     f'{node.service_node_pubkey[:10]}... - '
-                    f'🆕 Registration Height: {node.registration_height}'
+                    f'Registration Height: {node.registration_height}'
                 )
 
             pks = '\n'.join(pk_list)
-            bot.send_message(TO, f'New node(s):\n{pks}\n')
+            bot.send_message(TO, f'⭐️ New node(s):\n{pks}\n')
 
     def on_delayed_nodes(self, nodes):
         now = datetime.timestamp(datetime.now())
@@ -267,10 +267,11 @@ class Listener:
                 if node.last_uptime_proof == 0:
                     hproof = '🚫 Proof not received'
                 else:
-                    hproof = "🕙 %s" % humanize.precisedelta(proof_age,
-                                                               format="%0.4f")
+                    hproof = "🕙 %s" % humanize.precisedelta(
+                        proof_age, format="%0.4f")
 
-                pk_list.append(f'{node.service_node_pubkey[:10]}... - {hproof}')
+                pk_list.append(
+                    f'{node.service_node_pubkey[:10]}... - {hproof}')
 
             pks = '\n'.join(pk_list)
             bot.send_message(TO, f'Delayed node(s):\n{pks}\n')
@@ -278,9 +279,12 @@ class Listener:
     def on_total_nodes(self, nodes, daemon):
         uniq = len(set(node.operator_address for node in nodes))
         total = len(nodes)
-        bot.send_message(TO, f'Total node(s): {total}\n'
-                         f'Unique Operators: {uniq}\n'
-                         f'Height: {daemon.height}\n'
+        bot.send_message(TO,
+                         '<code>'
+                         f'Total node(s): {total}\n'
+                         f'Operators:     {uniq}\n'
+                         f'Height:        {daemon.height}\n</code>',
+                         parse_mode="HTML"
                          )
 
     def on_to_expire_nodes(self, nodes, daemon):
@@ -291,12 +295,12 @@ class Listener:
                 blocks_left = expires_at - daemon.height
                 pk_list.append(
                     f'{node.service_node_pubkey[:10]}... - '
-                    f'🧨 To expire at {expires_at} ({blocks_left} '
+                    f'To expire at {expires_at} ({blocks_left} '
                     'blocks left)'
                 )
 
             pks = '\n'.join(pk_list)
-            bot.send_message(TO, f'To expire node(s):\n{pks}\n')
+            bot.send_message(TO, f'🧨 To expire node(s):\n{pks}\n')
 
 
 def main():
