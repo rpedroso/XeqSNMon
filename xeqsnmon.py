@@ -185,7 +185,8 @@ class SNodes:
                 if is_vanished_node:
                     vanish_list.append(node)
 
-            for node in self:
+        for node in self:
+            if prev_node_list:
                 is_new_node = self.check_new(node, prev_node_list)
                 if is_new_node:
                     new_list.append(node)
