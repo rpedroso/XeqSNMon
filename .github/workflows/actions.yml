@@ -2,7 +2,7 @@ name: run xeqsnmon.py
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # Every 15 min
+    - cron: '*/59 * * * *' # Every 59 min
 
 jobs:
   build:
