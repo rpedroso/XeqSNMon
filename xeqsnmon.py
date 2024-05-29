@@ -1,3 +1,4 @@
+import time
 import pickle
 import logging
 from datetime import datetime
@@ -128,7 +129,9 @@ class SNodes:
 
     @staticmethod
     def get_all():
-        resp = requests.post(NODE_URL + '/json_rpc',
+        for i in range(5):
+            try:
+                resp = requests.post(NODE_URL + '/json_rpc',
                              json={
                                  "jsonrpc": "2.0",
                                  "id": "0",
@@ -136,6 +139,10 @@ class SNodes:
                              },
                              timeout=20
                              ).json()['result']['service_node_states']
+                break
+            except requests.exceptions.ReadTimeout:
+                logging.warning('Timeout: retrying...')
+                time.sleep(.2)
         return SNodes(resp)
 
     def check_vanish(self, node):
