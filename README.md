@@ -3,7 +3,7 @@
 
 ## Clone it
 ```
-# git clone https://github.com/rpedroso/XeqSNMon
+$ git clone https://github.com/rpedroso/XeqSNMon
 ```
 
 ## Intall requirements
