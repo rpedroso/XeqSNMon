@@ -1,5 +1,10 @@
-# How to using XeqSNMon
+# How to use XeqSNMon
 
+
+## Clone it
+```
+git clone https://github.com/rpedroso/XeqSNMon
+```
 
 ## Intall requirements
 ```
