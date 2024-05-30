@@ -141,8 +141,12 @@ class SNodes:
                              ).json()['result']['service_node_states']
                 break
             except requests.exceptions.ReadTimeout:
-                logging.warning('Timeout: retrying...')
-                time.sleep(.2)
+                if i < 4:
+                    logging.warning('Timeout: retrying...')
+                    time.sleep(.2)
+                else:
+                    logging.warning('Give up trying...')
+                    raise
         return SNodes(resp)
 
     def check_vanish(self, node):
