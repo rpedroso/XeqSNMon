@@ -294,9 +294,9 @@ class Listener:
 
         bot.send_message(TO,
                          '<code>'
-                         f'Total nodes:  {total}\n'
-                         f'Operators:      {uniq}\n'
-                         f'Height:         {daemon.height}\n</code>',
+                         f'Total nodes: {total}\n'
+                         f'Operators:   {uniq}\n'
+                         f'Height:      {daemon.height}\n</code>',
                          parse_mode="HTML"
                          )
 
