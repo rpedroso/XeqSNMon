@@ -291,13 +291,10 @@ class Listener:
     def on_total_nodes(self, nodes, daemon):
         uniq = len(set(node.operator_address for node in nodes))
         total = len(nodes)
-        total_active = len([node for node in nodes
-                           if node.total_contributed == 1000000000])
 
         bot.send_message(TO,
                          '<code>'
-                         f'Total node(s):  {total}\n'
-                         f'Active node(s): {total_active}\n'
+                         f'Total nodes:  {total}\n'
                          f'Operators:      {uniq}\n'
                          f'Height:         {daemon.height}\n</code>',
                          parse_mode="HTML"
